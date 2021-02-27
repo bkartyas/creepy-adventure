@@ -29,13 +29,16 @@ class Item:
     def __init__(self, position: Vec2):
         self.position = position
 
-    def moveToPosition(self, Table, position: Vec2):
+    def moveToPosition(self, table, position: Vec2):
         table.get(position).add(self)
         table.unset(self)
         self.position = position
 
     def isMovable(self):
         return True
+
+    def isDeadly(self):
+        return False
 
 class Character(Item):
     def __init__(self, position: Vec2):
@@ -68,6 +71,11 @@ class Table:
             raise IndexError()
 
         return self.lines[position.x][position.y]
+
+    def cells(self):
+        for line in self.lines:
+            for cell in line:
+                yield cell
 
     def isOffTheTable(self, position: Vec2):
         return position.x < 0 or position.x > self.lastRowIndex or position.y < 0 or position.y > self.lastColumnIndex
@@ -128,6 +136,16 @@ class Cell:
     def isEmpty(self):
         return True if len(self.items) == 0 else False
 
+    def has(self, item: Item):
+        return item in self.items
+
+    def isDeadly(self):
+        for item in self.items:
+            if item.isDeadly():
+                return True
+
+        return False
+
     def getMovable(self):
         for item in self.items:
             if item.isMovable():
@@ -158,7 +176,8 @@ class Adventurer(Character):
         self.moveToPosition(table, step_position)
         if movable:
             movable.moveToPosition(table, step_position)
-            return True
+
+        return True
 
 
 class Ghost(Character):
@@ -195,6 +214,9 @@ class Spider(Character):
 
     def __repr__(self):
         return 'S'
+
+    def isDeadly(self):
+        return True
 
     def step(self, table: Table):
         step_position = self.getStepPosition(table)
@@ -252,24 +274,8 @@ class Eye(Character):
     def __repr__(self):
         return 'O'
 
-    def step(self, table: Table):
-        step_position = self.position
-        if table.isOffTheTable(step_position + self.snake.direction):
-            return
-
-        while True:
-            step_position = step_position + self.snake.direction
-            if table.isOffTheTable(step_position + self.snake.direction) or not table.isEmpty(step_position):
-                self.moveToPosition(table, step_position)
-                return
-
-class Eye(Character):
-    def __init__(self, position: Vec2, snake: Snake):
-        super().__init__(position)
-        self.snake = snake
-
-    def __repr__(self):
-        return 'O'
+    def isDeadly(self):
+        return True
 
     def step(self, table: Table):
         step_position = self.position
@@ -281,6 +287,7 @@ class Eye(Character):
             if table.isOffTheTable(step_position + self.snake.direction) or not table.isEmpty(step_position):
                 self.moveToPosition(table, step_position)
                 return
+
 
 class Treasure(Item):
     def __init__(self, position: Vec2):
@@ -301,21 +308,33 @@ class Gamer(Adventurer):
 
 class Game:
     def __init__(self, table: Table, gamer: Gamer, enemies: List[Character]):
-        print(table)
         self.table = table
         self.gamer = gamer
         self.enemies = enemies
 
+    def isWon(self):
+        return self.table.getMovable(Vec2(0, 0)) and self.table.getMovable(Vec2(1, 0))
+
+    def isLost(self):
+        for cell in self.table.cells():
+            if cell.isDeadly() and cell.has(self.gamer):
+                return True
+
+        return False
+
     def step(self, direction: str, bring: bool):
-        print(self.table)
         #print(self.gamer)
-        self.gamer.step(table, direction, bring)
+        isSuccessful = self.gamer.step(table, direction, bring)
+        if not isSuccessful:
+            return False
         #print(self.table)
 
         for enemy in self.enemies:
             #print(enemy)
             enemy.step(table)
             #print(table)
+
+        return True
 
 
 table = Table(2, 4)
@@ -341,7 +360,20 @@ enemies = [ghost, eye, spider, snake]
 
 game = Game(table, gamer, enemies)
 
-for _ in range(25):
-    for direction, bring in gamer.possibleSteps():
-        print('{}, {}'.format(direction, bring))
-        game.step(direction, bring)
+step_index = 0
+possible_steps = [(direction, bring) for direction, bring in gamer.possibleSteps()]
+while True:
+    print(table)
+
+    if game.isWon() or game.isLost():
+        print('END! won: {}, lost: {}'.format(game.isWon(), game.isLost()))
+        print(table)
+        break
+
+    direction, bring = possible_steps[step_index]
+    print('{}, {}'.format(direction, bring))
+    print(game.step(direction, bring))
+
+    step_index = step_index + 1
+    if step_index == len(possible_steps):
+        step_index = 0
