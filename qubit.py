@@ -33,7 +33,7 @@ class Item:
         self.position = position
 
     def isMovable(self):
-    	return True
+        return True
 
 class Character(Item):
     def __init__(self, position: Vec2):
@@ -43,7 +43,7 @@ class Character(Item):
         pass
 
     def isMovable(self):
-    	return False
+        return False
 
 class Table:
     def __init__(self, height, width):
@@ -127,8 +127,8 @@ class Cell:
         return True if len(self.items) == 0 else False
 
     def getMovable(self):
-    	for item in items:
-    		return item if item.isMovable()
+        for item in items:
+            return item if item.isMovable()
 
         return None
 
@@ -146,25 +146,17 @@ class Adventurer(Character):
     def __repr__(self):
         return 'A'
 
-    def manualStep(self, table: Table, direction: string, bring: bool):
-		step_position = self.position + DIRECTION_VECTORS[direction]
-		movable = table.getMovable(self.position)
+    def step(self, table: Table, direction: string, bring: bool):
+        step_position = self.position + DIRECTION_VECTORS[direction]
+        movable = table.getMovable(self.position)
         if not table.isEmptyStepable(step_position) or (bring and movable == None):
-        	return False
+            return False
 
         self.moveToPosition(table, step_position)
         if movable:
-        	movable.moveToPosition(table, step_position)
-       	return True
+            movable.moveToPosition(table, step_position)
+           return True
 
-    def step(self, table: Table):
-        for step_vector in DIRECTION_VECTORS.values():
-            step_position = self.position + step_vector
-            if not table.isEmptyStepable(step_position):
-                continue
-
-            self.moveToPosition(table, step_position)
-            return
 
 class Ghost(Character):
     def __init__(self, position: Vec2):
@@ -294,9 +286,20 @@ class Treasure(Item):
     def __repr__(self):
         return '*'
 
+
+class Gamer(Adventurer):
+    def __init__(self, position: Vec2):
+        super().__init__(position)
+
+    def possibleSteps(self, table: Table):
+        for direction_vector in DIRECTION_VECTORS.keys()
+            for bring in [False, True]
+                yield direction_vector, bring
+
+
 table = Table(2, 4)
 
-adventurer = Adventurer(Vec2(1, 0))
+adventurer = Gamer(Vec2(1, 0))
 ghost = Ghost(Vec2(0, 1))
 snake = Snake(Vec2(1, 2))
 eye = Eye(Vec2(0, 2), snake)
@@ -319,17 +322,17 @@ enemies = [ghost, eye, spider, snake]
 
 for _ in range(25):
     for direction_vector in DIRECTION_VECTORS.keys()
-    	for bring in [False, True]
+        for bring in [False, True]
 
-	    print(adventurer)
-	    adventurer.manualStep(table, direction_vector, bring)
-	    print(table)
-		#stepback -- ha nem jó megoldás
-		#stack az állapotokhoz
-		#dict az állapotok eredményéhez
+        print(adventurer)
+        adventurer.manualStep(table, direction_vector, bring)
+        print(table)
+        #stepback -- ha nem jó megoldás
+        #stack az állapotokhoz
+        #dict az állapotok eredményéhez
 
     for enemy in enemies:
-    	print(enemy)
-    	enemy.step(table)
-    	print(table)
+        print(enemy)
+        enemy.step(table)
+        print(table)
 
