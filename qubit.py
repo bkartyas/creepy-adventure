@@ -307,10 +307,30 @@ class Gamer(Adventurer):
                 yield direction, bring
 
 class Game:
-    def __init__(self, table: Table, gamer: Gamer, enemies: List[Character]):
-        self.table = table
-        self.gamer = gamer
-        self.enemies = enemies
+    def __init__(self):
+        self.table = Table(2, 4)
+        self.gamer = Gamer(Vec2(1, 0))
+
+        self.ghost = Ghost(Vec2(0, 1))
+        self.snake = Snake(Vec2(1, 2))
+        self.eye = Eye(Vec2(0, 2), self.snake)
+        self.spider = Spider(Vec2(0, 0))
+
+        self.treasure1 = Treasure(Vec2(0, 3))
+        self.treasure2 = Treasure(Vec2(1, 3))
+
+        self.table.set(self.gamer)
+        self.table.set(self.ghost)
+        self.table.set(self.eye)
+        self.table.set(self.spider)
+        self.table.set(self.snake)
+        self.table.set(self.treasure1)
+        self.table.set(self.treasure2)
+
+        self.enemies = [self.ghost, self.eye, self.spider, self.snake]
+
+    def __repr__(self):
+        return str(self.table)
 
     def isWon(self):
         return self.table.getMovable(Vec2(0, 0)) and self.table.getMovable(Vec2(1, 0))
@@ -322,52 +342,29 @@ class Game:
 
         return False
 
+    def possibleSteps(self):
+        return self.gamer.possibleSteps()
+
     def step(self, direction: str, bring: bool):
-        #print(self.gamer)
-        isSuccessful = self.gamer.step(table, direction, bring)
-        if not isSuccessful:
+        if not self.gamer.step(self.table, direction, bring):
             return False
-        #print(self.table)
 
         for enemy in self.enemies:
-            #print(enemy)
-            enemy.step(table)
-            #print(table)
+            enemy.step(self.table)
 
         return True
 
 
-table = Table(2, 4)
-
-gamer = Gamer(Vec2(1, 0))
-ghost = Ghost(Vec2(0, 1))
-snake = Snake(Vec2(1, 2))
-eye = Eye(Vec2(0, 2), snake)
-spider = Spider(Vec2(0, 0))
-
-treasure1 = Treasure(Vec2(0, 3))
-treasure2 = Treasure(Vec2(1, 3))
-
-table.set(gamer)
-table.set(ghost)
-table.set(eye)
-table.set(spider)
-table.set(snake)
-table.set(treasure1)
-table.set(treasure2)
-
-enemies = [ghost, eye, spider, snake]
-
-game = Game(table, gamer, enemies)
+game = Game()
 
 step_index = 0
-possible_steps = [(direction, bring) for direction, bring in gamer.possibleSteps()]
+possible_steps = [(direction, bring) for direction, bring in game.possibleSteps()]
 while True:
-    print(table)
+    print(game)
 
     if game.isWon() or game.isLost():
         print('END! won: {}, lost: {}'.format(game.isWon(), game.isLost()))
-        print(table)
+        print(game)
         break
 
     direction, bring = possible_steps[step_index]
