@@ -52,6 +52,7 @@ class Character(Item):
 
 class Table:
     def __init__(self, height, width):
+        self.size = Vec2(height, width)
         self.lastColumnIndex = width - 1
         self.lastRowIndex = height - 1
         self.lines = [[Cell() for _ in range(width)] for _ in range(height)]
@@ -83,11 +84,17 @@ class Table:
     def isEmptyStepable(self, position: Vec2):
         return not self.isOffTheTable(position) and self.isEmpty(position)
 
+    def isStepOrMovable(self, position: Vec2):
+        return not self.isOffTheTable(position) and self.isOnlyMovable(position)
+
     def getMovable(self, position: Vec2):
         return self.get(position).getMovable()
 
     def isEmpty(self, position: Vec2):
         return self.get(position).isEmpty()
+
+    def isOnlyMovable(self, position: Vec2):
+        return self.get(position).isOnlyMovable()
 
     def isFirstRow(self, position: Vec2):
         return position.x == 0
@@ -136,6 +143,9 @@ class Cell:
     def isEmpty(self):
         return True if len(self.items) == 0 else False
 
+    def isOnlyMovable(self):
+        return self.isEmpty() or len(self.items) == 1 and self.getMovable() != None
+
     def has(self, item: Item):
         return item in self.items
 
@@ -167,14 +177,13 @@ class Adventurer(Character):
     def __repr__(self):
         return 'A'
 
-    def step(self, table: Table, direction_vector: Vec2, bring: bool):
+    def step(self, table: Table, direction: str, bring: bool):
         step_position = self.position + DIRECTION_VECTORS[direction]
         movable = table.getMovable(self.position)
-        if not table.isEmptyStepable(step_position) or (bring and movable == None):
             return False
 
         self.moveToPosition(table, step_position)
-        if movable:
+        if bring:
             movable.moveToPosition(table, step_position)
 
         return True
@@ -233,9 +242,9 @@ class Spider(Character):
             return table.upLeftCorner()
 
 class Snake(Character):
-    def __init__(self, position: Vec2):
+    def __init__(self, position: Vec2, direction: Vec2):
         super().__init__(position)
-        self.direction = DIRECTION_VECTORS['LEFT']
+        self.direction = direction
 
     def __repr__(self):
         if self.direction == DIRECTION_VECTORS['LEFT']:
@@ -307,17 +316,27 @@ class Gamer(Adventurer):
                 yield direction, bring
 
 class Game:
-    def __init__(self):
-        self.table = Table(2, 4)
-        self.gamer = Gamer(Vec2(1, 0))
+    def __init__(
+        self,
+        tableSize: Vec2 = Vec2(2, 4),
+        gamerPosition: Vec2 = Vec2(1, 0),
+        ghostPosition: Vec2 = Vec2(0, 1),
+        snakePosition: Vec2 = Vec2(1, 2), snakeDirection: Vec2 = DIRECTION_VECTORS['LEFT'],
+        eyePosition: Vec2 = Vec2(0, 2),
+        spiderPosition: Vec2 = Vec2(0, 0),
+        treasure1Position: Vec2 = Vec2(0, 3),
+        treasure2Position: Vec2 = Vec2(1, 3)
+    ):
+        self.table = Table(tableSize.x, tableSize.y)
+        self.gamer = Gamer(gamerPosition)
 
-        self.ghost = Ghost(Vec2(0, 1))
-        self.snake = Snake(Vec2(1, 2))
-        self.eye = Eye(Vec2(0, 2), self.snake)
-        self.spider = Spider(Vec2(0, 0))
+        self.ghost = Ghost(ghostPosition)
+        self.snake = Snake(snakePosition, snakeDirection)
+        self.eye = Eye(eyePosition, self.snake)
+        self.spider = Spider(spiderPosition)
 
-        self.treasure1 = Treasure(Vec2(0, 3))
-        self.treasure2 = Treasure(Vec2(1, 3))
+        self.treasure1 = Treasure(treasure1Position)
+        self.treasure2 = Treasure(treasure2Position)
 
         self.table.set(self.gamer)
         self.table.set(self.ghost)
@@ -331,6 +350,21 @@ class Game:
 
     def __repr__(self):
         return str(self.table)
+
+    def clone(self):
+        return Game(
+            self.table.size,
+            self.gamer.position,
+            self.ghost.position,
+            self.snake.position, self.snake.direction,
+            self.eye.position,
+            self.spider.position,
+            self.treasure1.position,
+            self.treasure2.position
+        )
+
+    def state(self):
+        return str(self)
 
     def isWon(self):
         return self.table.getMovable(Vec2(0, 0)) and self.table.getMovable(Vec2(1, 0))
@@ -355,22 +389,87 @@ class Game:
         return True
 
 
+class GamePossibility:
+    def __repr__(self):
+        return 'Win: {}, Lose: {}'.format(self.isWin(), self.isLose())
+
+    def isWin(self):
+        return False
+
+    def isLose(self):
+        return False
+
+class GameWinPossibility(GamePossibility):
+    def __init__(self, steps_to_win):
+        self.steps_to_win = steps_to_win
+
+    def isWin(self):
+        return True
+
+class GameLosePossibility(GamePossibility):
+    def isLose(self):
+        return True
+
+class GameSolver:
+    best_possibility = {}
+
+    def solve(self, game: Game):
+        game_state = game.state()
+        #print(game_state)
+        #import pprint; pprint.pprint(self.best_possibility); print()
+        if game_state in self.best_possibility:
+            #print('WAS HERE')
+            return GamePossibility()
+        else:
+            self.best_possibility[game_state] = GamePossibility()
+
+        if game.isLost():
+            print('LOSE')
+            #print(game_state)
+            return self.setLose(game_state)
+
+        if game.isWon() or game.isLost():
+            print('WIN')
+            return self.setWin(game_state, 0)
+
+        #print(game_state)
+        for step in game.possibleSteps():
+            game_clone = game.clone()
+            if not game_clone.step(*step):
+                continue
+
+            #print(step)
+            #print(game)
+
+            #print(step)
+            game_possibility = self.solve(game_clone)
+            #print(step)
+            #print(game_possibility)
+            #print(game)
+
+            if game_possibility.isWin() and (self.best_possibility[game_state].isWin() == False or game_possibility.steps_to_win + 1 < self.best_possibility[game_state].steps_to_win):
+                self.setWin(game_state, game_possibility.steps_to_win + 1)
+
+        #print('back')
+        return self.best_possibility[game_state]
+
+    def setWin(self, game_state, number_of_steps):
+        win_possibility = GameWinPossibility(number_of_steps)
+        self.best_possibility[game_state] = win_possibility
+        return win_possibility
+
+    def setLose(self, game_state):
+        if self.best_possibility[game_state].isWin():
+            #print('A')
+            #print(game_state)
+            return GamePossibility()
+
+        lose_possibility = GameLosePossibility()
+        self.best_possibility[game_state] = lose_possibility
+        return lose_possibility
+
+
 game = Game()
+gameSolver = GameSolver()
 
-step_index = 0
-possible_steps = [(direction, bring) for direction, bring in game.possibleSteps()]
-while True:
-    print(game)
-
-    if game.isWon() or game.isLost():
-        print('END! won: {}, lost: {}'.format(game.isWon(), game.isLost()))
-        print(game)
-        break
-
-    direction, bring = possible_steps[step_index]
-    print('{}, {}'.format(direction, bring))
-    print(game.step(direction, bring))
-
-    step_index = step_index + 1
-    if step_index == len(possible_steps):
-        step_index = 0
+gameSolver.solve(game)
