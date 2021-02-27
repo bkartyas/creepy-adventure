@@ -1,3 +1,5 @@
+from typing import List
+
 class Vec2:
     def __init__(self, x, y):
         self.x = x
@@ -127,8 +129,9 @@ class Cell:
         return True if len(self.items) == 0 else False
 
     def getMovable(self):
-        for item in items:
-            return item if item.isMovable()
+        for item in self.items:
+            if item.isMovable():
+                return item
 
         return None
 
@@ -146,7 +149,7 @@ class Adventurer(Character):
     def __repr__(self):
         return 'A'
 
-    def step(self, table: Table, direction: string, bring: bool):
+    def step(self, table: Table, direction_vector: Vec2, bring: bool):
         step_position = self.position + DIRECTION_VECTORS[direction]
         movable = table.getMovable(self.position)
         if not table.isEmptyStepable(step_position) or (bring and movable == None):
@@ -155,7 +158,7 @@ class Adventurer(Character):
         self.moveToPosition(table, step_position)
         if movable:
             movable.moveToPosition(table, step_position)
-           return True
+            return True
 
 
 class Ghost(Character):
@@ -291,15 +294,33 @@ class Gamer(Adventurer):
     def __init__(self, position: Vec2):
         super().__init__(position)
 
-    def possibleSteps(self, table: Table):
-        for direction_vector in DIRECTION_VECTORS.keys()
-            for bring in [False, True]
-                yield direction_vector, bring
+    def possibleSteps(self):
+        for direction in DIRECTION_VECTORS.keys():
+            for bring in [False, True]:
+                yield direction, bring
+
+class Game:
+    def __init__(self, table: Table, gamer: Gamer, enemies: List[Character]):
+        print(table)
+        self.table = table
+        self.gamer = gamer
+        self.enemies = enemies
+
+    def step(self, direction: str, bring: bool):
+        print(self.table)
+        #print(self.gamer)
+        self.gamer.step(table, direction, bring)
+        #print(self.table)
+
+        for enemy in self.enemies:
+            #print(enemy)
+            enemy.step(table)
+            #print(table)
 
 
 table = Table(2, 4)
 
-adventurer = Gamer(Vec2(1, 0))
+gamer = Gamer(Vec2(1, 0))
 ghost = Ghost(Vec2(0, 1))
 snake = Snake(Vec2(1, 2))
 eye = Eye(Vec2(0, 2), snake)
@@ -308,7 +329,7 @@ spider = Spider(Vec2(0, 0))
 treasure1 = Treasure(Vec2(0, 3))
 treasure2 = Treasure(Vec2(1, 3))
 
-table.set(adventurer)
+table.set(gamer)
 table.set(ghost)
 table.set(eye)
 table.set(spider)
@@ -316,23 +337,11 @@ table.set(snake)
 table.set(treasure1)
 table.set(treasure2)
 
-print(table)
-
 enemies = [ghost, eye, spider, snake]
 
+game = Game(table, gamer, enemies)
+
 for _ in range(25):
-    for direction_vector in DIRECTION_VECTORS.keys()
-        for bring in [False, True]
-
-        print(adventurer)
-        adventurer.manualStep(table, direction_vector, bring)
-        print(table)
-        #stepback -- ha nem jó megoldás
-        #stack az állapotokhoz
-        #dict az állapotok eredményéhez
-
-    for enemy in enemies:
-        print(enemy)
-        enemy.step(table)
-        print(table)
-
+    for direction, bring in gamer.possibleSteps():
+        print('{}, {}'.format(direction, bring))
+        game.step(direction, bring)
