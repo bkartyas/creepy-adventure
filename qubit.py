@@ -180,6 +180,7 @@ class Adventurer(Character):
     def step(self, table: Table, direction: str, bring: bool):
         step_position = self.position + DIRECTION_VECTORS[direction]
         movable = table.getMovable(self.position)
+        if step_position != self.position and not table.isStepOrMovable(step_position) or (bring and (not movable or table.getMovable(step_position))):
             return False
 
         self.moveToPosition(table, step_position)
@@ -312,7 +313,7 @@ class Gamer(Adventurer):
 
     def possibleSteps(self):
         for direction in DIRECTION_VECTORS.keys():
-            for bring in [False, True]:
+            for bring in [True, False]:
                 yield direction, bring
 
 class Game:
@@ -390,18 +391,22 @@ class Game:
 
 
 class GamePossibility:
-    def __repr__(self):
-        return 'Win: {}, Lose: {}'.format(self.isWin(), self.isLose())
-
     def isWin(self):
         return False
+
+    def __repr__(self):
+        return 'Win: {}, Lose: {}'.format(self.isWin(), self.isLose())
 
     def isLose(self):
         return False
 
 class GameWinPossibility(GamePossibility):
-    def __init__(self, steps_to_win):
+    def __init__(self, steps_to_win, next_state):
         self.steps_to_win = steps_to_win
+        self.next_state = next_state
+
+    def __repr__(self):
+        return 'Steps to win: {}'.format(self.steps_to_win)
 
     def isWin(self):
         return True
@@ -411,65 +416,82 @@ class GameLosePossibility(GamePossibility):
         return True
 
 class GameSolver:
-    best_possibility = {}
+    stack = []
+    best_possibilities = {}
+
+    def printResult(self, game):
+        print(len(self.best_possibilities))
+        game_state_str = game.state()
+        print(self.best_possibilities[game_state_str].steps_to_win)
+        print(game_state_str)
+        while self.best_possibilities[game_state_str].next_state != None:
+            game_state_str = self.best_possibilities[game_state_str].next_state
+            print(game_state_str)
 
     def solve(self, game: Game):
-        game_state = game.state()
-        #print(game_state)
-        #import pprint; pprint.pprint(self.best_possibility); print()
-        if game_state in self.best_possibility:
-            #print('WAS HERE')
-            return GamePossibility()
-        else:
-            self.best_possibility[game_state] = GamePossibility()
+        self.stack.append(game)
+        while len(self.stack) != 0:
+            game_state = self.stack[-1]
+            game_state_str = game_state.state()
 
-        if game.isLost():
-            print('LOSE')
-            #print(game_state)
-            return self.setLose(game_state)
+            if not game_state_str in self.best_possibilities:
+                self.best_possibilities[game_state_str] = GamePossibility()
 
-        if game.isWon() or game.isLost():
-            print('WIN')
-            return self.setWin(game_state, 0)
-
-        #print(game_state)
-        for step in game.possibleSteps():
-            game_clone = game.clone()
-            if not game_clone.step(*step):
+            if game_state.isLost():
+                print('LOSE')
+                self.setLose(game_state_str)
+                self.stack.pop()
                 continue
 
-            #print(step)
-            #print(game)
+            if game_state.isWon() or game.isLost():
+                print('WIN')
 
-            #print(step)
-            game_possibility = self.solve(game_clone)
-            #print(step)
-            #print(game_possibility)
-            #print(game)
+                self.setWin()
 
-            if game_possibility.isWin() and (self.best_possibility[game_state].isWin() == False or game_possibility.steps_to_win + 1 < self.best_possibility[game_state].steps_to_win):
-                self.setWin(game_state, game_possibility.steps_to_win + 1)
+                self.stack.pop()
+                continue
 
-        #print('back')
-        return self.best_possibility[game_state]
+            appended = False
+            for step in game_state.possibleSteps():
+                game_clone = game_state.clone()
+                success = game_clone.step(*step)
+                if not success:
+                    continue
 
-    def setWin(self, game_state, number_of_steps):
-        win_possibility = GameWinPossibility(number_of_steps)
-        self.best_possibility[game_state] = win_possibility
-        return win_possibility
+                state_after_step = game_clone.state()
+                if state_after_step in self.best_possibilities:
+                    if self.best_possibilities[state_after_step].isWin() == True:
+                        self.setWin(self.best_possibilities[state_after_step].steps_to_win + 1, state_after_step)
+
+                    continue
+
+                self.stack.append(game_clone)
+                appended = True
+                break
+
+            if not appended:
+                self.stack.pop()
+
+    def setWin(self, steps_to_win = 0, next_state = None):
+        for state in self.stack[::-1]:
+            state_str = state.state()
+            if self.best_possibilities[state_str].isWin() == True and steps_to_win > self.best_possibilities[state_str].steps_to_win:
+                break
+
+            self.best_possibilities[state_str] = GameWinPossibility(steps_to_win, next_state)
+
+            steps_to_win = steps_to_win + 1
+            next_state = state_str
 
     def setLose(self, game_state):
-        if self.best_possibility[game_state].isWin():
-            #print('A')
-            #print(game_state)
-            return GamePossibility()
+        if self.best_possibilities[game_state].isWin():
+            return
 
-        lose_possibility = GameLosePossibility()
-        self.best_possibility[game_state] = lose_possibility
-        return lose_possibility
+        self.best_possibilities[game_state] = GameLosePossibility()
 
 
 game = Game()
 gameSolver = GameSolver()
 
 gameSolver.solve(game)
+gameSolver.printResult(game)
